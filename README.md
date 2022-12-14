@@ -154,7 +154,7 @@ This example implementation was written by Rajeeb Kumar Malik.
 
 Contact:
 
-- rajeebk.malik@perfectabstractgmailions.com
+- rajeebk.malik@gmail.com
 
 ## License
 
