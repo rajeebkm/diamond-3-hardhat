@@ -5,7 +5,7 @@ const { ethers } = require("hardhat");
 const { getSelectors, FacetCutAction } = require("./libraries/diamond.js");
 
 async function deployDiamond() {
-  const diamond = "0x998abeb3E57409262aE5b751f60747921B33613E";
+  const diamond = "0x21915b79E1d334499272521a3508061354D13FF0";
   // const diamondInit = "0x3aAde2dCD2Df6a8cAc689EE797591b2913658659"
   // const diamondCut = "0x976fcd02f7C4773dd89C309fBF55D5923B4c98a1"
   const accounts = await ethers.getSigners();

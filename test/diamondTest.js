@@ -11,7 +11,7 @@ const { deployDiamond } = require('../scripts/deploy.js')
 
 const { assert, expect } = require('chai')
 const keccak256 = require('keccak256')
-const arrayBufferToHex = require('array-buffer-to-hex')
+// const arrayBufferToHex = require('array-buffer-to-hex')
 
 describe('DiamondTest', async function () {
   let diamondAddress
@@ -23,13 +23,13 @@ describe('DiamondTest', async function () {
   let tx
   let receipt
   let result
-  let owner
-  let addr1
-  let addr2
+  // let owner
+  // let addr1
+  // let addr2
   const addresses = []
 
   before(async function () {
-    [owner, addr1, addr2] = await ethers.getSigners();
+    // const [owner, addr1, addr2] = await ethers.getSigners();
     diamondAddress = await deployDiamond()
     diamondCutFacet = await ethers.getContractAt('DiamondCutFacet', diamondAddress)
     diamondLoupeFacet = await ethers.getContractAt('DiamondLoupeFacet', diamondAddress)
@@ -89,13 +89,30 @@ describe('DiamondTest', async function () {
     console.log(addresses)
     console.log('Facet addresses: ', await diamondLoupeFacet.facetAddresses())
     const selectors = getSelectors(contractAUpgradeFacet).remove(['supportsInterface(bytes4)'])
+    console.log(selectors)
+    // '0xa217fddf',
+    // '0xec87621c',
+    // '0xe959b38a',
+    // '0x6d4ce63c',..
+    // '0x248a9ca3',
+    // '0x2f2ff15d',
+    // '0x91d14854',
+    // '0xfe4b84df',..
+    // '0x8da5cb5b',..
+    // '0x8a66a962',
+    // '0x72176357',
+    // '0x715018a6',..
+    // '0x36568abe',
+    // '0xd547741f',
+    // '0x60fe47b1',..
+    // '0xf2fde38b',..
     tx = await diamondCutFacet.diamondCut(
       [{
         facetAddress: contractAUpgradeFacet.address,
         action: FacetCutAction.Add,
         functionSelectors: [
           "0xa217fddf",
-          "0x78357e53",
+          "0xec87621c",
           "0xe959b38a",
           "0x248a9ca3",
           "0x2f2ff15d",
@@ -152,25 +169,29 @@ describe('DiamondTest', async function () {
     assert.sameMembers(facets[findAddressPositionInFacets(addresses[3], facets)][1], getSelectors(contractAUpgradeFacet).remove(['supportsInterface(bytes4)']))
   })
 
-  it('should pass if caller is the Manager', async () => {
-    const contractAUpgradeFacet = await ethers.getContractAt('ContractAUpgradeFacet', diamondAddress)
-    const value = await contractAUpgradeFacet.get()
-    console.log("Initial Value: ", parseInt(value)) //0
-    let Manager = keccak256('MANAGER')
-    await contractAUpgradeFacet.grantRole(arrayBufferToHex(Manager), owner.address)
-    const newValue = await contractAUpgradeFacet.set(10)
-    console.log("New Value: ", parseInt(newValue))
-    console.log("contract Owner", owner.address)
-    // await diamondAddress.connect(contractOwner.address).set(10)
-  })
-
-
   it('should fail if caller is not the Manager', async () => {
+    const [owner, addr1, addr2] = await ethers.getSigners();
     const contractAUpgradeFacet = await ethers.getContractAt('ContractAUpgradeFacet', diamondAddress)
     const value = await contractAUpgradeFacet.get()
     console.log("Initial Value: ", parseInt(value))
     console.log("another account", addr1.address)
-    await expect (contractAFacet.connect(addr1.address).set(10)).to.be.revertedWith('Only Manager can call this')
+    await expect (contractAUpgradeFacet.connect(addr1.address).set(10)).to.be.reverted
+  })
+
+    it('should pass if caller is the Manager', async () => {
+    const [owner, addr1, addr2] = await ethers.getSigners();
+    console.log(owner.address)
+    const contractAUpgradeFacet = await ethers.getContractAt('ContractAUpgradeFacet', diamondAddress)
+    const value = await contractAUpgradeFacet.get()
+    console.log("Initial Value: ", parseInt(value)) //0
+    let MANAGER_ROLE = keccak256('MANAGER')
+    let defaultAdminRole = await contractAUpgradeFacet.DEFAULT_ADMIN_ROLE()
+    console.log(defaultAdminRole)
+    // console.log("Default admin role: ", await contractAUpgradeFacet.DEFAULT_ADMIN_ROLE())
+    // await contractAUpgradeFacet.addRole(defaultAdminRole, owner.address)
+    await contractAUpgradeFacet.addRole(MANAGER_ROLE, addr1.address)
+    // const newValue = await contractAUpgradeFacet.connect(addr1.address).set(10)
+    // console.log("New Value: ", parseInt(newValue))
   })
 
  

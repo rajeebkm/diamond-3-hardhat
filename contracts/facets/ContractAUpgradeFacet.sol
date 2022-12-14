@@ -9,10 +9,16 @@ import "./ContractBFacet.sol";
 contract ContractAUpgradeFacet is ContractAFacet, ContractBFacet {
     // ContractAAppStorage internal s;
 
-    bytes32 public Manager = keccak256('MANAGER');
+    bytes32 public MANAGER_ROLE = keccak256("MANAGER");
+
+    constructor() {
+        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(MANAGER_ROLE, msg.sender);
+
+    }
     
-    function set(uint256 _value) public virtual override nonReentrant {
-        require(hasRole(Manager, msg.sender), 'Only Manager can call this');
+    function set(uint256 _value) public virtual override onlyOwner nonReentrant {
+        require(hasRole(MANAGER_ROLE, msg.sender), 'Only Manager can call this');
         s.value += _value;
     }
 
