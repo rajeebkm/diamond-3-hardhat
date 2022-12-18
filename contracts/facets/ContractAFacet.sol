@@ -1,30 +1,29 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.1;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-// import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "../libraries/ContractAAppStorage.sol";
+// import { DiamondStorage, LibDiamond } from "../libraries/LibDiamond.sol";
+import { LibDiamond } from "../libraries/LibDiamond.sol";
+import { Pausable } from "../utils/Pausable.sol";
+import { IContractAFacet } from "../interfaces/IContractAFacet.sol";
 
-contract ContractAFacet is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract ContractAFacet is Pausable, IContractAFacet {
 
-    ContractAAppStorage internal s;
-    // uint256 public value;
 
-    function initialize(uint256 _newValue) public initializer {
-        // __Context_init_unchained();
-        __ReentrancyGuard_init();
-        __Ownable_init();
-        s.value = _newValue;
+
+    // function initialize() external virtual initializer {
+    //     __Context_init();
+    //     __Ownable_init();
+    //     // LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+    //     LibDiamond.setContractOwner(_msgSender());
+    // }
+
+    function set(uint256 _newValue) external virtual override onlyOwner nonReentrant {
+        LibDiamond._updatevalue(_newValue);
+        emit LibDiamond.ValueUpdated(_newValue);
     }
 
-    function set(uint256 _value) public virtual onlyOwner nonReentrant {
-        s.value += _value;
-    }
-
-    function get() public view virtual returns (uint){
-        return s.value;
+    function get() external view virtual override returns (uint){
+        return LibDiamond._getValue();
     }
 
     // function getSelector(string calldata _func) external pure returns (bytes4) {
