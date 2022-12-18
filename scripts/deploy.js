@@ -6,6 +6,8 @@ const { getSelectors, FacetCutAction } = require('./libraries/diamond.js')
 async function deployDiamond () {
   const accounts = await ethers.getSigners()
   const contractOwner = accounts[0]
+  // const accounts = await ethers.getSigners();
+  // const upgradeAdmin = accounts[0];
 
   // deploy DiamondCutFacet
   const DiamondCutFacet = await ethers.getContractFactory('DiamondCutFacet')
@@ -32,9 +34,7 @@ async function deployDiamond () {
   console.log('Deploying facets')
   const FacetNames = [
     'DiamondLoupeFacet',
-    'ContractAFacet',
-    // 'ContractAUpgradeFacet',
-    // 'ContractBFacet',
+    'ContractAFacet'
   ]
   const cut = []
   for (const FacetName of FacetNames) {
@@ -47,26 +47,43 @@ async function deployDiamond () {
       action: FacetCutAction.Add,
       functionSelectors: getSelectors(facet)
     })
-    console.log("ContractASelectors", getSelectors(facet))
   }
 
-   // upgrade diamond with facets
-   console.log('')
-   console.log('Diamond Cut:', cut)
-   const diamondCut = await ethers.getContractAt('IDiamondCut', diamond.address)
-   let tx
-   let receipt
-   // call to init function
-   let functionCall = diamondInit.interface.encodeFunctionData('init')
-   tx = await diamondCut.diamondCut(cut, diamondInit.address, functionCall)
-   console.log('Diamond cut tx: ', tx.hash)
-   receipt = await tx.wait()
-   if (!receipt.status) {
-     throw Error(`Diamond upgrade failed: ${tx.hash}`)
-   }
-   console.log('Completed diamond cut')
-   return diamond.address
- }
+
+  /// DEPLOY ACCESS_REGISTRY
+  const AccessRegistry = await ethers.getContractFactory("AccessRegistry");
+  const accessRegistry = await AccessRegistry.deploy(contractOwner.address);
+  const accessRegistryAddress = accessRegistry.address;
+  console.log("AccessRegistry deployed at ", accessRegistry.address);
+
+  // upgrade diamond with facets
+  console.log('')
+  console.log('Diamond Cut:', cut)
+  const diamondCut = await ethers.getContractAt('IDiamondCut', diamond.address)
+  let args = [];
+  args.push(contractOwner.address);
+  args.push(accessRegistryAddress);
+  console.log("args below::");
+  console.log(args);
+  // call to init function
+  let functionCall = diamondInit.interface.encodeFunctionData("init", args);
+  tx = await diamondCut.diamondCut(cut, diamondInit.address, functionCall);
+  console.log('Diamond cut tx: ', tx.hash)
+  receipt = await tx.wait()
+  if (!receipt.status) {
+    throw Error(`Diamond upgrade failed: ${tx.hash}`)
+  }
+  console.log('Completed diamond cut')
+
+  const ContractAFacets = await ethers.getContractAt("ContractAFacet", diamond.address)
+  const getValue = await ContractAFacets.get();
+  console.log("Get Initial Value: ", parseInt(getValue));
+  await ContractAFacets.set(25);
+  const getValue2 = await ContractAFacets.get();
+  console.log("Get Value after adding 25: ", parseInt(getValue2));
+  // await ContractAFacets.connect(accounts[1]).set(25); // 'Ownable: caller is not the owner'
+  return diamond.address
+}
 
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
