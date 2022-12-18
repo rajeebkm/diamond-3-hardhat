@@ -10,54 +10,40 @@ const {
 const { deployDiamond } = require('../scripts/deploy.js')
 
 const { assert, expect } = require('chai')
-const keccak256 = require('keccak256')
-// const arrayBufferToHex = require('array-buffer-to-hex')
 
 describe('DiamondTest', async function () {
   let diamondAddress
   let diamondCutFacet
   let diamondLoupeFacet
-  // let ownershipFacet
-  let contractAFacet
-  let contractAUpgradeFacet
+  let ownershipFacet
   let tx
   let receipt
   let result
-  // let owner
-  // let addr1
-  // let addr2
   const addresses = []
 
   before(async function () {
-    // const [owner, addr1, addr2] = await ethers.getSigners();
     diamondAddress = await deployDiamond()
     diamondCutFacet = await ethers.getContractAt('DiamondCutFacet', diamondAddress)
     diamondLoupeFacet = await ethers.getContractAt('DiamondLoupeFacet', diamondAddress)
     contractAFacet = await ethers.getContractAt('ContractAFacet', diamondAddress)
-    // console.log(parseInt(await contractAFacet.value())) // 0
   })
 
   it('should have three facets -- call to facetAddresses function', async () => {
     for (const address of await diamondLoupeFacet.facetAddresses()) {
       addresses.push(address)
     }
+
     assert.equal(addresses.length, 3)
-    console.log(addresses)
   })
 
   it('facets should have the right function selectors -- call to facetFunctionSelectors function', async () => {
     let selectors = getSelectors(diamondCutFacet)
-    // console.log(selectors)
     result = await diamondLoupeFacet.facetFunctionSelectors(addresses[0])
-    // console.log(result)
     assert.sameMembers(result, selectors)
     selectors = getSelectors(diamondLoupeFacet)
-    // console.log(selectors)
     result = await diamondLoupeFacet.facetFunctionSelectors(addresses[1])
-    // console.log(result)
     assert.sameMembers(result, selectors)
     selectors = getSelectors(contractAFacet)
-    // console.log(selectors)
     result = await diamondLoupeFacet.facetFunctionSelectors(addresses[2])
     assert.sameMembers(result, selectors)
   })
@@ -81,120 +67,218 @@ describe('DiamondTest', async function () {
     )
   })
 
-  it('should add ContractAUpgradeFacet functions', async () => {
-    const ContractAUpgradeFacet = await ethers.getContractFactory('ContractAUpgradeFacet')
-    contractAUpgradeFacet = await ContractAUpgradeFacet.deploy()
-    await contractAUpgradeFacet.deployed()
-    addresses.push(contractAUpgradeFacet.address)
-    console.log(addresses)
-    console.log('Facet addresses: ', await diamondLoupeFacet.facetAddresses())
-    const selectors = getSelectors(contractAUpgradeFacet).remove(['supportsInterface(bytes4)'])
-    console.log(selectors)
-    // '0xa217fddf',
-    // '0xec87621c',
-    // '0xe959b38a',
-    // '0x6d4ce63c',..
-    // '0x248a9ca3',
-    // '0x2f2ff15d',
-    // '0x91d14854',
-    // '0xfe4b84df',..
-    // '0x8da5cb5b',..
-    // '0x8a66a962',
-    // '0x72176357',
-    // '0x715018a6',..
-    // '0x36568abe',
-    // '0xd547741f',
-    // '0x60fe47b1',..
-    // '0xf2fde38b',..
-    tx = await diamondCutFacet.diamondCut(
-      [{
-        facetAddress: contractAUpgradeFacet.address,
-        action: FacetCutAction.Add,
-        functionSelectors: [
-          "0xa217fddf",
-          "0xec87621c",
-          "0xe959b38a",
-          "0x248a9ca3",
-          "0x2f2ff15d",
-          "0x91d14854",
-          "0x8a66a962",
-          "0x72176357",
-          "0x36568abe",
-          "0xd547741f",
-        ],
-      },
-      {
-        facetAddress: contractAUpgradeFacet.address,
-        action: FacetCutAction.Replace,
-        functionSelectors: [
-          "0x6d4ce63c",
-          "0xfe4b84df",
-          "0x8da5cb5b",
-          "0x715018a6",
-          "0x60fe47b1",
-          "0xf2fde38b",
-        ],
-      }],
-      ethers.constants.AddressZero, '0x', { gasLimit: 800000 })
-    receipt = await tx.wait()
-    if (!receipt.status) {
-      throw Error(`Diamond upgrade failed: ${tx.hash}`)
-    }
-    result = await diamondLoupeFacet.facetFunctionSelectors(contractAUpgradeFacet.address)
-    assert.sameMembers(result, selectors)
-    console.log('Facet addresses after upgrade: ', await diamondLoupeFacet.facetAddresses())
+  it('should test ContractAFacet call', async () => {
+    const accounts = await ethers.getSigners()
+    const contractOwner = accounts[0]
+    const ContractAFacet = await ethers.getContractAt("ContractAFacet", diamondAddress)
+    const getValue = await ContractAFacet.get();
+    // console.log("Get Initial Value in test: ", parseInt(getValue));
+    assert.equal(parseInt(getValue), 25);
+    await ContractAFacet.set(35);
+    const getValue2 = await ContractAFacet.get();
+    // console.log("Get Value after adding: ", parseInt(getValue2));
+    assert.equal(parseInt(getValue2), 60);
+    // await ContractAFacet.connect(accounts[1]).set(50); // Ownable: caller is not the owner'
+    await expect(ContractAFacet.connect(accounts[1]).set(50)).to.be.reverted
+    // const getValue3 = await ContractAFacet.get();
+    // console.log("Get Value: ", parseInt(getValue3));
   })
 
-  it('should test function call', async () => {
-    const contractAFacet = await ethers.getContractAt('ContractAFacet', diamondAddress)
-    await contractAFacet.get()
+  it('should test ContractAUpgradeFacet call', async () => {
+    const accounts = await ethers.getSigners()
+    const contractOwner = accounts[0]
+    const ContractAUpgradeFacet = await ethers.getContractAt("ContractAUpgradeFacet", diamondAddress)
+    const getValue = await ContractAUpgradeFacet.get();
+    // console.log("Get Initial Value in test: ", parseInt(getValue));
+    assert.equal(parseInt(getValue), 60);
+    await ContractAUpgradeFacet.set(45);
+    const getValue2 = await ContractAUpgradeFacet.get();
+    // console.log("Get Value after adding 45: ", parseInt(getValue2));
+    assert.equal(parseInt(getValue2), 105);
+    // await ContractAFacet.connect(accounts[1]).set(50); // Ownable: caller is not the owner'
+    await expect(ContractAUpgradeFacet.connect(accounts[1]).set(50)).to.be.reverted
+    // const getValue3 = await ContractAFacet.get();
+    // console.log("Get Value: ", parseInt(getValue3));
   })
 
-  it('should check facets and selectors', async () => {
-    const facets = await diamondLoupeFacet.facets()
-    const facetAddresses = await diamondLoupeFacet.facetAddresses()
-    console.log(facets)
-    console.log(facetAddresses)
-    console.log(addresses)
-    console.log(getSelectors(contractAUpgradeFacet).remove(['supportsInterface(bytes4)']))
-    console.log(facets[findAddressPositionInFacets(addresses[3], facets)][1])
-    assert.equal(facetAddresses.length, 3)
-    assert.equal(facets.length, 3)
-    // assert.sameMembers(facetAddresses, addresses)
-    assert.equal(facets[0][0], facetAddresses[0], 'first facet')
-    assert.equal(facets[1][0], facetAddresses[1], 'second facet')
-    assert.equal(facets[2][0], facetAddresses[2], 'third facet')
-    assert.sameMembers(facets[findAddressPositionInFacets(addresses[0], facets)][1], getSelectors(diamondCutFacet))
-    assert.sameMembers(facets[findAddressPositionInFacets(addresses[1], facets)][1], getSelectors(diamondLoupeFacet))
-    assert.sameMembers(facets[findAddressPositionInFacets(addresses[3], facets)][1], getSelectors(contractAUpgradeFacet).remove(['supportsInterface(bytes4)']))
-  })
+  // it('should add test1 functions', async () => {
+  //   const Test1Facet = await ethers.getContractFactory('Test1Facet')
+  //   const test1Facet = await Test1Facet.deploy()
+  //   await test1Facet.deployed()
+  //   addresses.push(test1Facet.address)
+  //   const selectors = getSelectors(test1Facet).remove(['supportsInterface(bytes4)'])
+  //   tx = await diamondCutFacet.diamondCut(
+  //     [{
+  //       facetAddress: test1Facet.address,
+  //       action: FacetCutAction.Add,
+  //       functionSelectors: selectors
+  //     }],
+  //     ethers.constants.AddressZero, '0x', { gasLimit: 800000 })
+  //   receipt = await tx.wait()
+  //   if (!receipt.status) {
+  //     throw Error(`Diamond upgrade failed: ${tx.hash}`)
+  //   }
+  //   result = await diamondLoupeFacet.facetFunctionSelectors(test1Facet.address)
+  //   assert.sameMembers(result, selectors)
+  // })
 
-  it('should fail if caller is not the Manager', async () => {
-    const [owner, addr1, addr2] = await ethers.getSigners();
-    const contractAUpgradeFacet = await ethers.getContractAt('ContractAUpgradeFacet', diamondAddress)
-    const value = await contractAUpgradeFacet.get()
-    console.log("Initial Value: ", parseInt(value))
-    console.log("another account", addr1.address)
-    await expect (contractAUpgradeFacet.connect(addr1.address).set(10)).to.be.reverted
-  })
+  // it('should test function call', async () => {
+  //   const test1Facet = await ethers.getContractAt('Test1Facet', diamondAddress)
+  //   await test1Facet.test1Func10()
+  // })
 
-    it('should pass if caller is the Manager', async () => {
-    const [owner, addr1, addr2] = await ethers.getSigners();
-    console.log(owner.address)
-    const contractAUpgradeFacet = await ethers.getContractAt('ContractAUpgradeFacet', diamondAddress)
-    const value = await contractAUpgradeFacet.get()
-    console.log("Initial Value: ", parseInt(value)) //0
-    let MANAGER_ROLE = keccak256('MANAGER')
-    let defaultAdminRole = await contractAUpgradeFacet.DEFAULT_ADMIN_ROLE()
-    console.log(defaultAdminRole)
-    // console.log("Default admin role: ", await contractAUpgradeFacet.DEFAULT_ADMIN_ROLE())
-    // await contractAUpgradeFacet.addRole(defaultAdminRole, owner.address)
-    await contractAUpgradeFacet.addRole(MANAGER_ROLE, addr1.address)
-    // const newValue = await contractAUpgradeFacet.connect(addr1.address).set(10)
-    // console.log("New Value: ", parseInt(newValue))
-  })
+  // it('should replace supportsInterface function', async () => {
+  //   const Test1Facet = await ethers.getContractFactory('Test1Facet')
+  //   const selectors = getSelectors(Test1Facet).get(['supportsInterface(bytes4)'])
+  //   const testFacetAddress = addresses[3]
+  //   tx = await diamondCutFacet.diamondCut(
+  //     [{
+  //       facetAddress: testFacetAddress,
+  //       action: FacetCutAction.Replace,
+  //       functionSelectors: selectors
+  //     }],
+  //     ethers.constants.AddressZero, '0x', { gasLimit: 800000 })
+  //   receipt = await tx.wait()
+  //   if (!receipt.status) {
+  //     throw Error(`Diamond upgrade failed: ${tx.hash}`)
+  //   }
+  //   result = await diamondLoupeFacet.facetFunctionSelectors(testFacetAddress)
+  //   assert.sameMembers(result, getSelectors(Test1Facet))
+  // })
 
- 
+  // it('should add test2 functions', async () => {
+  //   const Test2Facet = await ethers.getContractFactory('Test2Facet')
+  //   const test2Facet = await Test2Facet.deploy()
+  //   await test2Facet.deployed()
+  //   addresses.push(test2Facet.address)
+  //   const selectors = getSelectors(test2Facet)
+  //   tx = await diamondCutFacet.diamondCut(
+  //     [{
+  //       facetAddress: test2Facet.address,
+  //       action: FacetCutAction.Add,
+  //       functionSelectors: selectors
+  //     }],
+  //     ethers.constants.AddressZero, '0x', { gasLimit: 800000 })
+  //   receipt = await tx.wait()
+  //   if (!receipt.status) {
+  //     throw Error(`Diamond upgrade failed: ${tx.hash}`)
+  //   }
+  //   result = await diamondLoupeFacet.facetFunctionSelectors(test2Facet.address)
+  //   assert.sameMembers(result, selectors)
+  // })
 
+  // it('should remove some test2 functions', async () => {
+  //   const test2Facet = await ethers.getContractAt('Test2Facet', diamondAddress)
+  //   const functionsToKeep = ['test2Func1()', 'test2Func5()', 'test2Func6()', 'test2Func19()', 'test2Func20()']
+  //   const selectors = getSelectors(test2Facet).remove(functionsToKeep)
+  //   tx = await diamondCutFacet.diamondCut(
+  //     [{
+  //       facetAddress: ethers.constants.AddressZero,
+  //       action: FacetCutAction.Remove,
+  //       functionSelectors: selectors
+  //     }],
+  //     ethers.constants.AddressZero, '0x', { gasLimit: 800000 })
+  //   receipt = await tx.wait()
+  //   if (!receipt.status) {
+  //     throw Error(`Diamond upgrade failed: ${tx.hash}`)
+  //   }
+  //   result = await diamondLoupeFacet.facetFunctionSelectors(addresses[4])
+  //   assert.sameMembers(result, getSelectors(test2Facet).get(functionsToKeep))
+  // })
+
+  // it('should remove some test1 functions', async () => {
+  //   const test1Facet = await ethers.getContractAt('Test1Facet', diamondAddress)
+  //   const functionsToKeep = ['test1Func2()', 'test1Func11()', 'test1Func12()']
+  //   const selectors = getSelectors(test1Facet).remove(functionsToKeep)
+  //   tx = await diamondCutFacet.diamondCut(
+  //     [{
+  //       facetAddress: ethers.constants.AddressZero,
+  //       action: FacetCutAction.Remove,
+  //       functionSelectors: selectors
+  //     }],
+  //     ethers.constants.AddressZero, '0x', { gasLimit: 800000 })
+  //   receipt = await tx.wait()
+  //   if (!receipt.status) {
+  //     throw Error(`Diamond upgrade failed: ${tx.hash}`)
+  //   }
+  //   result = await diamondLoupeFacet.facetFunctionSelectors(addresses[3])
+  //   assert.sameMembers(result, getSelectors(test1Facet).get(functionsToKeep))
+  // })
+
+  // it('remove all functions and facets except \'diamondCut\' and \'facets\'', async () => {
+  //   let selectors = []
+  //   let facets = await diamondLoupeFacet.facets()
+  //   for (let i = 0; i < facets.length; i++) {
+  //     selectors.push(...facets[i].functionSelectors)
+  //   }
+  //   selectors = removeSelectors(selectors, ['facets()', 'diamondCut(tuple(address,uint8,bytes4[])[],address,bytes)'])
+  //   tx = await diamondCutFacet.diamondCut(
+  //     [{
+  //       facetAddress: ethers.constants.AddressZero,
+  //       action: FacetCutAction.Remove,
+  //       functionSelectors: selectors
+  //     }],
+  //     ethers.constants.AddressZero, '0x', { gasLimit: 800000 })
+  //   receipt = await tx.wait()
+  //   if (!receipt.status) {
+  //     throw Error(`Diamond upgrade failed: ${tx.hash}`)
+  //   }
+  //   facets = await diamondLoupeFacet.facets()
+  //   assert.equal(facets.length, 2)
+  //   assert.equal(facets[0][0], addresses[0])
+  //   assert.sameMembers(facets[0][1], ['0x1f931c1c'])
+  //   assert.equal(facets[1][0], addresses[1])
+  //   assert.sameMembers(facets[1][1], ['0x7a0ed627'])
+  // })
+
+
+  // it('add most functions and facets', async () => {
+  //   const diamondLoupeFacetSelectors = getSelectors(diamondLoupeFacet).remove(['supportsInterface(bytes4)'])
+  //   const Test1Facet = await ethers.getContractFactory('Test1Facet')
+  //   const Test2Facet = await ethers.getContractFactory('Test2Facet')
+  //   // Any number of functions from any number of facets can be added/replaced/removed in a
+  //   // single transaction
+  //   const cut = [
+  //     {
+  //       facetAddress: addresses[1],
+  //       action: FacetCutAction.Add,
+  //       functionSelectors: diamondLoupeFacetSelectors.remove(['facets()'])
+  //     },
+  //     {
+  //       facetAddress: addresses[2],
+  //       action: FacetCutAction.Add,
+  //       functionSelectors: getSelectors(ownershipFacet)
+  //     },
+  //     {
+  //       facetAddress: addresses[3],
+  //       action: FacetCutAction.Add,
+  //       functionSelectors: getSelectors(Test1Facet)
+  //     },
+  //     {
+  //       facetAddress: addresses[4],
+  //       action: FacetCutAction.Add,
+  //       functionSelectors: getSelectors(Test2Facet)
+  //     }
+  //   ]
+  //   tx = await diamondCutFacet.diamondCut(cut, ethers.constants.AddressZero, '0x', { gasLimit: 8000000 })
+  //   receipt = await tx.wait()
+  //   if (!receipt.status) {
+  //     throw Error(`Diamond upgrade failed: ${tx.hash}`)
+  //   }
+  //   const facets = await diamondLoupeFacet.facets()
+  //   const facetAddresses = await diamondLoupeFacet.facetAddresses()
+  //   assert.equal(facetAddresses.length, 5)
+  //   assert.equal(facets.length, 5)
+  //   assert.sameMembers(facetAddresses, addresses)
+  //   assert.equal(facets[0][0], facetAddresses[0], 'first facet')
+  //   assert.equal(facets[1][0], facetAddresses[1], 'second facet')
+  //   assert.equal(facets[2][0], facetAddresses[2], 'third facet')
+  //   assert.equal(facets[3][0], facetAddresses[3], 'fourth facet')
+  //   assert.equal(facets[4][0], facetAddresses[4], 'fifth facet')
+  //   assert.sameMembers(facets[findAddressPositionInFacets(addresses[0], facets)][1], getSelectors(diamondCutFacet))
+  //   assert.sameMembers(facets[findAddressPositionInFacets(addresses[1], facets)][1], diamondLoupeFacetSelectors)
+  //   assert.sameMembers(facets[findAddressPositionInFacets(addresses[2], facets)][1], getSelectors(ownershipFacet))
+  //   assert.sameMembers(facets[findAddressPositionInFacets(addresses[3], facets)][1], getSelectors(Test1Facet))
+  //   assert.sameMembers(facets[findAddressPositionInFacets(addresses[4], facets)][1], getSelectors(Test2Facet))
+  // })
 })
-
