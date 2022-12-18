@@ -38,6 +38,10 @@ library LibDiamond {
         mapping(bytes4 => bool) supportedInterfaces;
         // owner of the contract
         address contractOwner;
+        address superAdminAddress;
+        uint256 value;
+        bytes32 MANAGER_ROLE;
+        bytes32 superAdmin;
     }
 
     function diamondStorage() internal pure returns (DiamondStorage storage ds) {
@@ -62,6 +66,23 @@ library LibDiamond {
 
     function enforceIsContractOwner() internal view {
         require(msg.sender == diamondStorage().contractOwner, "LibDiamond: Must be contract owner");
+    }
+
+
+    event ValueUpdated(uint256 newValue);
+
+    function _getValue() internal view returns (uint256) {
+        DiamondStorage storage ds = diamondStorage();
+        return ds.value;
+    }
+
+    function _updatevalue(
+        uint256 _newValue
+    ) internal {
+        DiamondStorage storage ds = diamondStorage();
+        DiamondStorage storage updateValue = ds;
+        updateValue.value += _newValue;
+        emit ValueUpdated(_newValue);
     }
 
     event DiamondCut(IDiamondCut.FacetCut[] _diamondCut, address _init, bytes _calldata);
